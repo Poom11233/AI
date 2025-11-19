@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Voice Chat</title>
+<title>AI Lite Voice Chat</title>
 <style>
 body { font-family: Arial; background: #111; color:#fff; text-align:center; padding:20px; }
 .container { max-width:600px; margin:auto; }
@@ -17,7 +17,7 @@ textarea { width:90%; padding:10px; font-size:16px; border-radius:8px; border:no
 </head>
 <body>
 <div class="container">
-<h2>AI Voice Chat</h2>
+<h2>AI Lite Voice Chat</h2>
 <textarea id="questionInput" rows="3" placeholder="พิมพ์คำถามหรือกดไมค์เพื่อถาม..."></textarea>
 <br>
 <button id="askBtn">ถามข้อความ</button>
@@ -27,7 +27,41 @@ textarea { width:90%; padding:10px; font-size:16px; border-radius:8px; border:no
 </div>
 
 <script>
-let messages = [{role:"system", content:"You are a helpful assistant."}];
+// ----- ระบบ Pattern Matching -----
+const QA = [
+  { pattern: /สวัสดี|ไงบ้าง|hello/i, answer: ["สวัสดีครับ!", "สวัสดี มีอะไรอยากถามไหม?"] },
+  { pattern: /ชื่ออะไร|คุณชื่ออะไร/i, answer: ["ผมชื่อ AI Lite Chat", "เรียกผมว่า AI Lite ก็ได้"] },
+  { pattern: /ทำอะไรได้/i, answer: ["ผมสามารถตอบคำถามทั่วไปและพูดคุยกับคุณได้", "ลองถามผมอะไรก็ได้!"] },
+  { pattern: /วันอะไร|วันที่/i, answer: [() => new Date().toLocaleDateString("th-TH")] },
+  { pattern: /เวลาตอนนี้|ตอนนี้กี่โมง/i, answer: [() => new Date().toLocaleTimeString("th-TH")] },
+  { pattern: /ขอบคุณ|thanks/i, answer: ["ยินดีครับ!", "ไม่เป็นไรครับ"] }
+  { pattern: /รู้จักวิทยาลัยเทคนิคสมุทรสาครมั้ย |thanks/i, answer: ["ใช่ครับ ผมรู้จัก วิทยาลัยเทคนิคสมุทรสาคร (Samut Sakhon Technical College) วิทยาลัยเทคนิคสมุทรสาครมีทั้งหลักสูตร ปวช. (ประกาศนียบัตรวิชาชีพ) และ ปวส. (ประกาศนียบัตรวิชาชีพชั้นสูง) ตัวอย่างสาขาวิชาที่สอน เทคโนโลยีสารสนเทศ ช่างเทคนิคคอมพิวเตอร์ อิเล็กทรอนิกส์ แมคคาทรอนิกส์และหุ่นยนต์ ไฟฟ้ากำลัง เทคโนโลยีธุรกิจดิจิทัล ครับ"] }
+];
+
+const defaultAnswers = ["ขอโทษครับ ผมยังไม่เข้าใจคำถามนี้", "ลองถามอย่างอื่นดูสิ", "ไม่แน่ใจครับ ลองถามใหม่อีกครั้ง"];
+
+function answerQuestion(q){
+  q = q.trim();
+  let ans = defaultAnswers[Math.floor(Math.random()*defaultAnswers.length)];
+  for(let i=0;i<QA.length;i++){
+    if(q.match(QA[i].pattern)){
+      const responses = QA[i].answer;
+      ans = typeof responses[0]==="function" ? responses[0]() : responses[Math.floor(Math.random()*responses.length)];
+      break;
+    }
+  }
+  document.getElementById("answerBox").innerText = ans;
+  speak(ans);
+}
+
+// ----- Text-to-Speech -----
+function speak(text){
+  const ut = new SpeechSynthesisUtterance(text);
+  ut.lang="th-TH";
+  speechSynthesis.speak(ut);
+}
+
+// ----- Speech-to-Text -----
 let recognition;
 if("webkitSpeechRecognition" in window){
   recognition = new webkitSpeechRecognition();
@@ -36,51 +70,27 @@ if("webkitSpeechRecognition" in window){
   recognition.onresult=(e)=>{
     const text = e.results[0][0].transcript;
     document.getElementById("questionInput").value=text;
-    sendMessage();
+    answerQuestion(text);
   }
   recognition.onend=()=>{
     document.getElementById("speakBtn").style.display="inline";
     document.getElementById("stopBtn").style.display="none";
   }
-} else { alert("เบราว์เซอร์ไม่รองรับเสียง"); }
-
-function speak(text){
-  const ut = new SpeechSynthesisUtterance(text);
-  ut.lang="th-TH";
-  speechSynthesis.speak(ut);
+}else{
+  alert("เบราว์เซอร์ไม่รองรับระบบฟังเสียง");
 }
 
-async function sendMessage(){
-  const input = document.getElementById("questionInput").value;
-  if(!input.trim()) return;
-  const userMsg = {role:"user", content:input};
-  messages.push(userMsg);
-  document.getElementById("questionInput").value="";
-  document.getElementById("answerBox").innerText="กำลังประมวลผล...";
-
-  try{
-    const resp = await fetch("http://localhost:3000/api/chat", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({messages})
-    });
-    const data = await resp.json();
-    const aiMsg = data.choices[0].message;
-    messages.push(aiMsg);
-    document.getElementById("answerBox").innerText = aiMsg.content;
-    speak(aiMsg.content);
-  } catch(err){
-    document.getElementById("answerBox").innerText = "Error: "+err.message;
-  }
-}
-
-document.getElementById("askBtn").onclick = sendMessage;
-document.getElementById("speakBtn").onclick = ()=>{
+// ----- ปุ่ม -----
+document.getElementById("askBtn").onclick=()=>{
+  const q = document.getElementById("questionInput").value;
+  answerQuestion(q);
+};
+document.getElementById("speakBtn").onclick=()=>{
   recognition.start();
   document.getElementById("speakBtn").style.display="none";
   document.getElementById("stopBtn").style.display="inline";
 };
-document.getElementById("stopBtn").onclick = ()=> recognition.stop();
+document.getElementById("stopBtn").onclick=()=>recognition.stop();
 </script>
 </body>
 </html>
