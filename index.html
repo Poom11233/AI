@@ -3,144 +3,84 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Voice QA Web</title>
-
+<title>AI Voice Chat</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #111;
-        color: #fff;
-        text-align: center;
-        padding: 20px;
-    }
-    .container {
-        max-width: 600px;
-        margin: auto;
-    }
-    button {
-        padding: 12px 20px;
-        font-size: 18px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        margin: 10px;
-    }
-    #askBtn { background: #0066ff; color: white; }
-    #speakBtn { background: #00cc66; color: white; }
-    #stopBtn { background: #ff4444; color: white; display:none; }
-    #answerBox {
-        margin-top: 20px;
-        padding: 15px;
-        background: #222;
-        border-radius: 10px;
-        min-height: 60px;
-    }
+body { font-family: Arial; background: #111; color:#fff; text-align:center; padding:20px; }
+.container { max-width:600px; margin:auto; }
+button { padding:12px 20px; font-size:18px; border:none; border-radius:8px; cursor:pointer; margin:10px; }
+#askBtn{background:#0066ff;color:#fff;}
+#speakBtn{background:#00cc66;color:#fff;}
+#stopBtn{background:#ff4444;display:none;}
+#answerBox{margin-top:20px; padding:15px; background:#222; border-radius:10px; min-height:60px;}
+textarea { width:90%; padding:10px; font-size:16px; border-radius:8px; border:none; }
 </style>
 </head>
-
 <body>
 <div class="container">
-    <h2>ระบบตอบคำถามด้วยเสียง</h2>
-    <p>พูดคำถาม หรือพิมพ์คำถามก็ได้</p>
-
-    <input id="questionInput" type="text" placeholder="พิมพ์คำถามที่นี่..." style="width:90%;padding:10px;font-size:16px;border-radius:8px;border:none;">
-
-    <br><br>
-
-    <button id="askBtn">ถามด้วยข้อความ</button>
-    <button id="speakBtn">🎤 พูดถาม</button>
-    <button id="stopBtn">⛔ หยุดฟัง</button>
-
-    <div id="answerBox">คำตอบจะแสดงที่นี่</div>
+<h2>AI Voice Chat</h2>
+<textarea id="questionInput" rows="3" placeholder="พิมพ์คำถามหรือกดไมค์เพื่อถาม..."></textarea>
+<br>
+<button id="askBtn">ถามข้อความ</button>
+<button id="speakBtn">🎤 พูดถาม</button>
+<button id="stopBtn">⛔ หยุดฟัง</button>
+<div id="answerBox">คำตอบจะแสดงที่นี่</div>
 </div>
 
 <script>
-// -----------------------
-// 1) คลังคำถาม–คำตอบที่คุณตั้งเอง
-// -----------------------
-const QA = {
-    "ชื่ออะไร": "ผมคือผู้ช่วย AI ของคุณครับ",
-    "ทำอะไรได้บ้าง": "ผมสามารถตอบคำถามและพูดคุยกับคุณได้",
-    "วันนี้วันอะไร": () => new Date().toLocaleDateString("th-TH"),
-    "สวัสดี": "สวัสดีครับ! มีอะไรอยากถามผมไหม?"
-};
-
-// -----------------------
-// 2) ฟังก์ชันตอบคำถาม
-// -----------------------
-function answerQuestion(q) {
-    q = q.trim();
-
-    let ans = "ขอโทษครับ ผมยังไม่เข้าใจคำถามนี้";
-
-    // ถ้าตรงกับคำถามที่กำหนดไว้
-    for (let key in QA) {
-        if (q.includes(key)) {
-            ans = typeof QA[key] === "function" ? QA[key]() : QA[key];
-            break;
-        }
-    }
-
-    document.getElementById("answerBox").innerText = ans;
-    speak(ans); // พูดตอบออกลำโพง
-}
-
-// -----------------------
-// 3) Text → Speech (ตอบกลับเป็นเสียง)
-// -----------------------
-function speak(text) {
-    const ut = new SpeechSynthesisUtterance(text);
-    ut.lang = "th-TH";
-    speechSynthesis.speak(ut);
-}
-
-// -----------------------
-// 4) Speech → Text (ฟังเสียงผู้ใช้)
-// -----------------------
+let messages = [{role:"system", content:"You are a helpful assistant."}];
 let recognition;
-if ("webkitSpeechRecognition" in window) {
-    recognition = new webkitSpeechRecognition();
-    recognition.lang = "th-TH";
-    recognition.continuous = false;
+if("webkitSpeechRecognition" in window){
+  recognition = new webkitSpeechRecognition();
+  recognition.lang="th-TH";
+  recognition.continuous=false;
+  recognition.onresult=(e)=>{
+    const text = e.results[0][0].transcript;
+    document.getElementById("questionInput").value=text;
+    sendMessage();
+  }
+  recognition.onend=()=>{
+    document.getElementById("speakBtn").style.display="inline";
+    document.getElementById("stopBtn").style.display="none";
+  }
+} else { alert("เบราว์เซอร์ไม่รองรับเสียง"); }
 
-    recognition.onresult = function(event) {
-        const text = event.results[0][0].transcript;
-        document.getElementById("questionInput").value = text;
-        answerQuestion(text);
-    };
-
-    recognition.onend = function() {
-        document.getElementById("speakBtn").style.display = "inline";
-        document.getElementById("stopBtn").style.display = "none";
-    };
-} else {
-    alert("เบราว์เซอร์นี้ไม่รองรับระบบฟังเสียง");
+function speak(text){
+  const ut = new SpeechSynthesisUtterance(text);
+  ut.lang="th-TH";
+  speechSynthesis.speak(ut);
 }
 
-// -----------------------
-// 5) ปุ่มถามด้วยข้อความ
-// -----------------------
-document.getElementById("askBtn").onclick = () => {
-    const q = document.getElementById("questionInput").value;
-    answerQuestion(q);
-};
+async function sendMessage(){
+  const input = document.getElementById("questionInput").value;
+  if(!input.trim()) return;
+  const userMsg = {role:"user", content:input};
+  messages.push(userMsg);
+  document.getElementById("questionInput").value="";
+  document.getElementById("answerBox").innerText="กำลังประมวลผล...";
 
-// -----------------------
-// 6) ปุ่มเริ่มฟังเสียง
-// -----------------------
-document.getElementById("speakBtn").onclick = () => {
-    recognition.start();
-    document.getElementById("speakBtn").style.display = "none";
-    document.getElementById("stopBtn").style.display = "inline";
-};
+  try{
+    const resp = await fetch("http://localhost:3000/api/chat", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({messages})
+    });
+    const data = await resp.json();
+    const aiMsg = data.choices[0].message;
+    messages.push(aiMsg);
+    document.getElementById("answerBox").innerText = aiMsg.content;
+    speak(aiMsg.content);
+  } catch(err){
+    document.getElementById("answerBox").innerText = "Error: "+err.message;
+  }
+}
 
-// -----------------------
-// 7) ปุ่มหยุดฟังเสียง
-// -----------------------
-document.getElementById("stopBtn").onclick = () => {
-    recognition.stop();
+document.getElementById("askBtn").onclick = sendMessage;
+document.getElementById("speakBtn").onclick = ()=>{
+  recognition.start();
+  document.getElementById("speakBtn").style.display="none";
+  document.getElementById("stopBtn").style.display="inline";
 };
+document.getElementById("stopBtn").onclick = ()=> recognition.stop();
 </script>
-
 </body>
 </html>
