@@ -1,96 +1,25 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Lite Voice Chat</title>
-<style>
-body { font-family: Arial; background: #111; color:#fff; text-align:center; padding:20px; }
-.container { max-width:600px; margin:auto; }
-button { padding:12px 20px; font-size:18px; border:none; border-radius:8px; cursor:pointer; margin:10px; }
-#askBtn{background:#0066ff;color:#fff;}
-#speakBtn{background:#00cc66;color:#fff;}
-#stopBtn{background:#ff4444;display:none;}
-#answerBox{margin-top:20px; padding:15px; background:#222; border-radius:10px; min-height:60px;}
-textarea { width:90%; padding:10px; font-size:16px; border-radius:8px; border:none; }
-</style>
-</head>
-<body>
-<div class="container">
-<h2>AI Lite Voice Chat</h2>
-<textarea id="questionInput" rows="3" placeholder="พิมพ์คำถามหรือกดไมค์เพื่อถาม..."></textarea>
-<br>
-<button id="askBtn">ถามข้อความ</button>
-<button id="speakBtn">🎤 พูดถาม</button>
-<button id="stopBtn">⛔ หยุดฟัง</button>
-<div id="answerBox">คำตอบจะแสดงที่นี่</div>
-</div>
-
+<input id="question" placeholder="ถามอะไรสักอย่าง...">
+<button onclick="ask()">ส่ง</button>
+<div id="answer"></div>
 <script>
-// ----- ระบบ Pattern Matching -----
-const QA = [
-  { pattern: /สวัสดี|ไงบ้าง|hello/i, answer: ["สวัสดีครับ!", "สวัสดี มีอะไรอยากถามไหม?"] },
-  { pattern: /ชื่ออะไร|คุณชื่ออะไร/i, answer: ["ผมชื่อ AI Lite Chat", "เรียกผมว่า AI Lite ก็ได้"] },
-  { pattern: /ทำอะไรได้/i, answer: ["ผมสามารถตอบคำถามทั่วไปและพูดคุยกับคุณได้", "ลองถามผมอะไรก็ได้!"] },
-  { pattern: /วันอะไร|วันที่/i, answer: [() => new Date().toLocaleDateString("th-TH")] },
-  { pattern: /เวลาตอนนี้|ตอนนี้กี่โมง/i, answer: [() => new Date().toLocaleTimeString("th-TH")] },
-  { pattern: /ขอบคุณ|thanks/i, answer: ["ยินดีครับ!", "ไม่เป็นไรครับ"] }
-  { pattern: /รู้จักวิทยาลัยเทคนิคสมุทรสาครมั้ย |thanks/i, answer: ["ใช่ครับ ผมรู้จัก วิทยาลัยเทคนิคสมุทรสาคร (Samut Sakhon Technical College) วิทยาลัยเทคนิคสมุทรสาครมีทั้งหลักสูตร ปวช. (ประกาศนียบัตรวิชาชีพ) และ ปวส. (ประกาศนียบัตรวิชาชีพชั้นสูง) ตัวอย่างสาขาวิชาที่สอน เทคโนโลยีสารสนเทศ ช่างเทคนิคคอมพิวเตอร์ อิเล็กทรอนิกส์ แมคคาทรอนิกส์และหุ่นยนต์ ไฟฟ้ากำลัง เทคโนโลยีธุรกิจดิจิทัล ครับ"] }
-];
+const API_TOKEN = "hf_hf_RwiANkCInyeULjmnzQfoNEdMuOrSurONdI";
+const API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large";
 
-const defaultAnswers = ["ขอโทษครับ ผมยังไม่เข้าใจคำถามนี้", "ลองถามอย่างอื่นดูสิ", "ไม่แน่ใจครับ ลองถามใหม่อีกครั้ง"];
+async function ask() {
+  let q = document.getElementById("question").value;
 
-function answerQuestion(q){
-  q = q.trim();
-  let ans = defaultAnswers[Math.floor(Math.random()*defaultAnswers.length)];
-  for(let i=0;i<QA.length;i++){
-    if(q.match(QA[i].pattern)){
-      const responses = QA[i].answer;
-      ans = typeof responses[0]==="function" ? responses[0]() : responses[Math.floor(Math.random()*responses.length)];
-      break;
-    }
-  }
-  document.getElementById("answerBox").innerText = ans;
-  speak(ans);
+  let response = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${API_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ inputs: q })
+  });
+
+  let data = await response.json();
+  let answer = data[0]?.generated_text || "เกิดข้อผิดพลาด";
+
+  document.getElementById("answer").innerText = answer;
 }
-
-// ----- Text-to-Speech -----
-function speak(text){
-  const ut = new SpeechSynthesisUtterance(text);
-  ut.lang="th-TH";
-  speechSynthesis.speak(ut);
-}
-
-// ----- Speech-to-Text -----
-let recognition;
-if("webkitSpeechRecognition" in window){
-  recognition = new webkitSpeechRecognition();
-  recognition.lang="th-TH";
-  recognition.continuous=false;
-  recognition.onresult=(e)=>{
-    const text = e.results[0][0].transcript;
-    document.getElementById("questionInput").value=text;
-    answerQuestion(text);
-  }
-  recognition.onend=()=>{
-    document.getElementById("speakBtn").style.display="inline";
-    document.getElementById("stopBtn").style.display="none";
-  }
-}else{
-  alert("เบราว์เซอร์ไม่รองรับระบบฟังเสียง");
-}
-
-// ----- ปุ่ม -----
-document.getElementById("askBtn").onclick=()=>{
-  const q = document.getElementById("questionInput").value;
-  answerQuestion(q);
-};
-document.getElementById("speakBtn").onclick=()=>{
-  recognition.start();
-  document.getElementById("speakBtn").style.display="none";
-  document.getElementById("stopBtn").style.display="inline";
-};
-document.getElementById("stopBtn").onclick=()=>recognition.stop();
 </script>
-</body>
-</html>
